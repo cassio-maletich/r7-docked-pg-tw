@@ -1,0 +1,59 @@
+x-default: &default
+  env_file: .env
+  environment:
+    REDIS_URL: redis://redis:6379/0
+  stdin_open: true
+  tty: true
+  volumes:
+    - .:/app
+    - bundle_cache:/usr/local/bundle
+services:
+  app:
+    <<: *default
+    build:
+      context: ./
+      dockerfile: development.Dockerfile
+    entrypoint: './entrypoint.sh'
+    command: bash -c "rm -f tmp/pids/server.pid && foreman start -f Procfile.dev"
+    volumes:
+      - .:/usr/src/app
+      - bundle:/usr/local/bundle
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - HISTFILE=/usr/src/app/log/.bash_history 
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    links:
+      - db
+  db:
+    <<: *default
+    image: postgres:16
+    ports:
+      - "5438:5432"
+    volumes:
+      - clarity_pg_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: clarity
+      POSTGRES_PASSWORD: password
+    healthcheck:
+      test: pg_isready -U postgres
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  redis:
+    image: redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - '6377:6379'
+
+volumes:
+  clarity_pg_data:
+  redis_data:
+  bundle:
